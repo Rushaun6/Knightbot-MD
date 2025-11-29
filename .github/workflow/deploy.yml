@@ -1,0 +1,31 @@
+name: Knightbot-MD Bot Runner (Keep Alive)
+
+on:
+  workflow_dispatch:   # Manual trigger
+  schedule:
+    - cron: '0 * * * *' # Optional: every hour
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run Bot with Keep-Alive
+        run: |
+          echo "Starting Knightbot-MD..."
+          while true; do
+            node index.js
+            echo "Bot crashed or exited. Restarting in 5 seconds..."
+            sleep 5
+          done
