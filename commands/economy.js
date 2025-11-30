@@ -1,129 +1,56 @@
 const fs = require('fs');
-const path = './database.json';
+const path = require('path');
 
-// Load or initialize database
-let db = {};
-if (fs.existsSync(path)) {
-    db = JSON.parse(fs.readFileSync(path));
-} else {
-    db = { users: {} };
-    fs.writeFileSync(path, JSON.stringify(db, null, 2));
+const dbPath = path.join(__dirname, '../../storage/economy.json');
+
+function loadDB() {
+    if (!fs.existsSync(dbPath)) return {};
+    return JSON.parse(fs.readFileSync(dbPath));
 }
 
-// Save DB
-function saveDB() {
-    fs.writeFileSync(path, JSON.stringify(db, null, 2));
+function saveDB(data) {
+    fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
 }
 
-// Ensure user exists
-function ensureUser(id) {
-    if (!db.users[id]) {
-        db.users[id] = { wallet: 100, inventory: {}, lastDaily: 0 };
-        saveDB();
-    }
-}
+async function slotCommand(sock, chatId, senderId, message) {
+    const db = loadDB();
 
-// Wallet
-function getWallet(id) {
-    ensureUser(id);
-    return db.users[id].wallet;
-}
-function addCoins(id, amount) {
-    ensureUser(id);
-    db.users[id].wallet += amount;
-    saveDB();
-}
-function removeCoins(id, amount) {
-    ensureUser(id);
-    db.users[id].wallet -= amount;
-    saveDB();
-}
-
-// Slot machine
-function spinSlot(id, bet) {
-    ensureUser(id);
-    if (bet > db.users[id].wallet) return { error: 'Not enough coins!' };
-
-    const emojis = ['🍒','🍋','🍊','🍉','🍇','💎','⭐','🍀'];
-    const result = [];
-    for (let i=0;i<3;i++) result.push(emojis[Math.floor(Math.random()*emojis.length)]);
-
-    let winnings = 0;
-    if (result[0] === result[1] && result[1] === result[2]) winnings = bet * 5; // triple
-    else if (result[0] === result[1] || result[1] === result[2] || result[0] === result[2]) winnings = bet * 2; // double
-
-    db.users[id].wallet -= bet;
-    db.users[id].wallet += winnings;
-    saveDB();
-
-    return { result, winnings };
-}
-
-// Leaderboard
-function getLeaderboard() {
-    const users = Object.entries(db.users)
-        .sort((a,b) => b[1].wallet - a[1].wallet)
-        .slice(0,10)
-        .map(([id,data], idx)=>`${idx+1}. ${id} - 💰${data.wallet} coins`);
-    return users.join('\n');
-}
-
-// Store
-const store = {
-    '🍹 Juice': 50,
-    '🪄 Magic Wand': 200,
-    '⚔️ Sword': 500,
-};
-
-// Buy item
-function buyItem(id, item) {
-    ensureUser(id);
-    if (!store[item]) return '❌ Item does not exist.';
-    if (db.users[id].wallet < store[item]) return '❌ Not enough coins!';
-    db.users[id].wallet -= store[item];
-    if (!db.users[id].inventory[item]) db.users[id].inventory[item] = 0;
-    db.users[id].inventory[item] += 1;
-    saveDB();
-    return `✅ You bought ${item}!`;
-}
-
-// Inventory
-function getInventory(id) {
-    ensureUser(id);
-    const items = db.users[id].inventory;
-    if (Object.keys(items).length === 0) return '👜 Your inventory is empty.';
-    let text = '👜 Your Inventory:\n';
-    for (let item in items) text += `${item} x${items[item]}\n`;
-    return text;
-}
-
-// Daily coins
-function claimDaily(id) {
-    ensureUser(id);
-    const now = Date.now();
-    const lastClaim = db.users[id].lastDaily || 0;
-    const oneDay = 24 * 60 * 60 * 1000;
-
-    if (now - lastClaim < oneDay) {
-        const nextTime = new Date(lastClaim + oneDay);
-        return { error: `⏰ You can claim your next daily reward at ${nextTime.toLocaleString()}` };
+    if (!db[senderId]) {
+        db[senderId] = { balance: 0 };
     }
 
-    const reward = Math.floor(Math.random() * 100) + 50; // 50–150 coins
-    db.users[id].wallet += reward;
-    db.users[id].lastDaily = now;
-    saveDB();
-    return { reward };
+    const user = db[senderId];
+
+    if (user.balance < 50) {
+        await sock.sendMessage(chatId, { 
+            text: "You need at least *50 coins* to spin the slot machine!", 
+        }, { quoted: message });
+        return;
+    }
+
+    const items = ["🍒", "🍋", "🍉", "⭐", "🔔"];
+    const slot1 = items[Math.floor(Math.random() * items.length)];
+    const slot2 = items[Math.floor(Math.random() * items.length)];
+    const slot3 = items[Math.floor(Math.random() * items.length)];
+
+    let resultText = `🎰 *Slot Machine* 🎰\n\n${slot1} | ${slot2} | ${slot3}\n\n`;
+
+    if (slot1 === slot2 && slot2 === slot3) {
+        user.balance += 200;
+        resultText += `🎉 JACKPOT!!! You won *200 coins*!`;
+    } else if (slot1 === slot2 || slot2 === slot3 || slot1 === slot3) {
+        user.balance += 50;
+        resultText += `🔥 Nice! You won *50 coins*!`;
+    } else {
+        user.balance -= 50;
+        resultText += `😢 You lost *50 coins*! Better luck next time.`;
+    }
+
+    saveDB(db);
+
+    await sock.sendMessage(chatId, { 
+        text: resultText 
+    }, { quoted: message });
 }
 
-module.exports = {
-    getWallet,
-    addCoins,
-    removeCoins,
-    spinSlot,
-    getLeaderboard,
-    store,
-    buyItem,
-    getInventory,
-    claimDaily
-};
+module.exports = slotCommand;
