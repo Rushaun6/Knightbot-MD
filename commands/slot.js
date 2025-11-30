@@ -1,7 +1,13 @@
 const fs = require('fs');
 const path = require('path');
 
-const dbPath = path.join(__dirname, '../../storage/economy.json');
+// Make sure storage folder exists
+const dbFolder = path.join(__dirname, '../storage');
+const dbPath = path.join(dbFolder, 'economy.json');
+
+if (!fs.existsSync(dbFolder)) {
+    fs.mkdirSync(dbFolder, { recursive: true });
+}
 
 function loadDB() {
     if (!fs.existsSync(dbPath)) return {};
