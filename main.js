@@ -634,6 +634,9 @@ async function handleMessages(sock, messageUpdate, printLog) {
             case userMessage.startsWith('.insult'):
                 await insultCommand(sock, chatId, message);
                 break;
+            case userMessage === '.slot':
+                await slotCommand(sock, chatId, senderId, message)        
+                break;
             case userMessage.startsWith('.8ball'):
                 const question = userMessage.split(' ').slice(1).join(' ');
                 await eightBallCommand(sock, chatId, question);
