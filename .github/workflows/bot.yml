@@ -1,0 +1,30 @@
+name: Knightbot-MD Bot Runner (Hourly Restart)
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # Runs once every hour
+  workflow_dispatch:       # Allow manual start
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: knightbot-md
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run Bot
+        run: |
+          echo "Starting Knightbot-MD..."
+          node index.js
