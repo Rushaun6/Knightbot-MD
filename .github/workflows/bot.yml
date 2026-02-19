@@ -24,7 +24,11 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Run Bot
+      - name: Keep Bot Running
         run: |
           echo "Starting Knightbot-MD..."
-          node index.js
+          # Loop to auto-reconnect on crash or session failure
+          while true; do
+            node index.js || echo "Bot crashed, restarting in 5s..."
+            sleep 5
+          done
